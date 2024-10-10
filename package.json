@@ -1,0 +1,33 @@
+{
+  "name": "test-image-processing",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/server.ts"
+  },
+  "dependencies": {
+    "csv-parser": "^3.0.0",
+    "dotenv": "^16.4.5",
+    "drizzle-orm": "^0.16.1",
+    "express": "^4.21.1",
+    "multer": "^1.4.5-lts.1",
+    "pg": "^8.13.0",
+    "tsconfig-paths": "^4.2.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0",
+    "@types/multer": "^1.4.12",
+    "@types/node": "^22.7.5",
+    "@types/pg": "^8.11.10",
+    "drizzle-kit": "^0.25.0",
+    "ts-node": "^10.9.2",
+    "ts-node-dev": "^2.0.0",
+    "tsx": "^4.19.1",
+    "typescript": "^5.6.3"
+  },
+  "author": "Sourabh Mandal",
+  "license": "ISC",
+  "description": "An app to process images and genenerate csv output"
+}
