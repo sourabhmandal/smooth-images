@@ -1,33 +1,19 @@
 import csv from "csv-parser";
 import { Request, Response } from "express";
-import fs from "fs";
+import fs from "fs-extra";
 import multer from "multer";
-import { AppDataSource } from "../db/index";
-import { FileMetadata } from "../fileMetadata/fileMetadata.model";
-import { imageQueue } from "../queue/image-process";
-import { ProductImages } from "./product.model";
-const productImagesRepository = AppDataSource.getRepository(ProductImages);
-const fileMetadataRepository = AppDataSource.getRepository(FileMetadata);
+import { createFileImageCompressionQueue } from "../queue/image-process";
+import { savedProductImageUrls, saveFileMetadata } from "./product.service";
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
 // Configure multer for file uploads
 const upload = multer({ dest: "uploads/" });
 
-// Define an interface for CSV row data
-interface CSVRow {
-  "S. No.": string;
-  "Product Name": string;
-  "Input Image Urls": string;
-}
-
 // Type definition for the Multer file object
-interface MulterRequest extends Request {
-  file?: Express.Multer.File;
-}
 
 export function uploadCsv(req: MulterRequest, res: Response): void {
-  const results: CSVRow[] = [];
+  const inputCsvFileRows: CSVRow[] = [];
 
   // Check if the file is provided
   if (!req.file) {
@@ -38,73 +24,32 @@ export function uploadCsv(req: MulterRequest, res: Response): void {
   // Read and parse the CSV file
   fs.createReadStream(req.file.path)
     .pipe(csv())
-    .on("data", (data: CSVRow) => results.push(data))
+    .on("data", (data: CSVRow) => inputCsvFileRows.push(data))
     .on("end", async () => {
+      const savedFileData = await saveFileMetadata(
+        inputCsvFileRows,
+        req.file?.originalname ?? ""
+      );
       // Remove the file after processing
       if (req.file) {
         fs.unlinkSync(req.file.path);
       }
 
-      let insertData: Array<ProductImages> = [];
-
-      // create a file meta
-      if (req.file) {
-        const allImagesCount = results.reduce(
-          (acc, curr) =>
-            curr["Input Image Urls"].split(",").map((url) => url.trim())
-              .length + acc,
-          0
-        );
-        const fileMetadata: FileMetadata = {
-          fileName: req.file.originalname,
-          totalImages: allImagesCount,
-          imageProcessed: 0,
-          images: [],
-        };
-        const reqFile = await fileMetadataRepository.upsert(fileMetadata, {
-          conflictPaths: ["fileName"],
-          skipUpdateIfNoValuesChanged: true,
-        });
-
-        // create file image list
-        results.map((data) => {
-          const daaa = data["Input Image Urls"]
-            .split(",")
-            .map((url) => url.trim());
-
-          const insertValues: Array<ProductImages> = daaa.map((url) => ({
-            slNo: data["S. No."],
-            sku: data["Product Name"],
-            rawImageUrl: url,
-            rawImageSize: 0,
-            fileMetadata: fileMetadata,
-          }));
-
-          return insertData.push(...insertValues);
-        });
-      }
-
-      // Save the data to database
-      const insertResponse = await productImagesRepository
-        .createQueryBuilder()
-        .insert()
-        .into(ProductImages)
-        .values(insertData)
-        .execute();
-
-      // Create image processing jobs
-      imageQueue.addBulk(
-        insertData.map((data) => ({
-          data: {
-            serialNumber: data.slNo,
-            imageUrl: data.rawImageUrl,
-            fileId: data.fileMetadata.id,
-            fileName: data.fileMetadata.fileName,
-          },
-        }))
+      const savedProductImages = await savedProductImageUrls(
+        inputCsvFileRows,
+        savedFileData
       );
 
-      res.json({ savedProduct: insertResponse.generatedMaps });
+      if (savedFileData.id) {
+        createFileImageCompressionQueue(
+          savedFileData.id,
+          savedFileData.fileName
+        );
+
+        res.json({ request_id: savedFileData.id, status: "pending" });
+        return;
+      }
+      res.json({ request_id: null, status: "failed" });
     })
     .on("error", (err) => {
       console.error("Error reading CSV file:", err);

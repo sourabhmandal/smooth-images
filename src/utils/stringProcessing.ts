@@ -9,3 +9,11 @@ export function removeBaseUrl(url: string): string {
 
   return url; // Return the original URL if it doesn't match
 }
+
+export function sanitizeImagePath(path: string): string {
+  return path.replace(/[/\s]/g, "-"); // Return the original URL if it doesn't match
+}
+
+export function extractImageFileName(imageFileWithExt: string): string {
+  return imageFileWithExt.split(".").slice(0, -1).join("-");
+}

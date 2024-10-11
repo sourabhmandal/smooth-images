@@ -21,7 +21,8 @@
     "pg": "^8.13.0",
     "sharp": "^0.33.5",
     "tsconfig-paths": "^4.2.0",
-    "typeorm": "^0.3.20"
+    "typeorm": "^0.3.20",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.0",

@@ -1,41 +1,111 @@
 import axios from "axios";
 import Queue, { Job } from "bull";
 import fs from "fs-extra";
-import path from "path";
 import sharp from "sharp";
+import { env } from "../config/env";
 import { AppDataSource } from "../db";
-import { FileMetadata } from "../fileMetadata/fileMetadata.model";
+import {
+  FileMetadata,
+  FileProcessingStatus,
+} from "../fileMetadata/fileMetadata.model";
 import { ImageProcessingStatus, ProductImages } from "../product/product.model";
-import { removeBaseUrl } from "../utils/url";
+import { FILE_PUBLIC_PATH, PROCESSED_FILE_SAVE_PATH } from "../utils/constants";
 
 const productImagesRepository = AppDataSource.getRepository(ProductImages);
 const fileMetadataRepository = AppDataSource.getRepository(FileMetadata);
 
-// Create a Bull queue named 'image-processing'
-export const imageQueue = new Queue("image-processing", {
-  redis: "redis://localhost:6379",
-});
+export async function createFileImageCompressionQueue(
+  fileId: number,
+  fileName: string
+) {
+  const productImages = await productImagesRepository.find({
+    where: { fileMetadata: { id: fileId } },
+  });
 
-// Define the processing function for each image job
-imageQueue.process(async (job: Job) => {
-  const { imageUrl, serialNumber, fileId, fileName } = job.data;
-
-  // Download the image, compress it, and save it locally
-  const compressedImagePath = await compressImage(
-    serialNumber,
-    imageUrl,
-    fileId,
-    fileName
+  const pendingImages = productImages.filter(
+    (prImg) => prImg.status === ImageProcessingStatus.PENDING
   );
 
-  // Update job progress (e.g., 50% done, etc.)
-  job.progress(100);
+  // Create a Bull queue named 'image-processing'
+  const imageQueue = new Queue(`image-processing-${fileId}-${fileName}`, {
+    redis: env.REDIS_URL,
+  });
 
-  return {
-    message: "Image processed successfully",
-    compressedImagePath,
-  };
-});
+  await fileMetadataRepository.update(
+    { id: fileId },
+    { status: FileProcessingStatus.PROCESSING }
+  );
+
+  if (pendingImages.length === 0) {
+    await fileMetadataRepository.update(
+      { id: fileId },
+      { status: FileProcessingStatus.COMPLETED }
+    );
+  } else {
+    // Create image processing jobs
+    imageQueue.addBulk(
+      pendingImages.map((data) => ({
+        data: {
+          serialNumber: data.slNo,
+          sku: data.sku,
+          imageUrl: data.rawImageUrl,
+          fileId: fileId,
+          fileName: fileName,
+        },
+      }))
+    );
+  }
+
+  imageQueue.on("completed", async (job: Job) => {
+    console.log(`Image job ${job.id} : ${job.name} completed`);
+    await fileMetadataRepository.update(
+      { id: fileId },
+      { status: FileProcessingStatus.COMPLETED }
+    );
+  });
+
+  // Define the processing function for each image job
+  imageQueue.process(async (job: Job) => {
+    const { imageUrl, sku, serialNumber, fileId, fileName } = job.data;
+
+    productImagesRepository.update(
+      {
+        slNo: serialNumber,
+        sku: sku,
+        status: ImageProcessingStatus.PENDING,
+        fileMetadata: { id: fileId, fileName: fileName },
+      },
+      {
+        status: ImageProcessingStatus.PROCESSING,
+      }
+    );
+
+    // Download the image, compress it, and save it locally
+    const compressedImagePath = await compressImage(
+      serialNumber,
+      imageUrl,
+      fileId,
+      fileName
+    );
+
+    job.progress(100);
+    productImagesRepository.update(
+      {
+        slNo: serialNumber,
+        sku: sku,
+        fileMetadata: { id: fileId, fileName: fileName },
+      },
+      {
+        status: ImageProcessingStatus.COMPLETED,
+      }
+    );
+
+    return {
+      message: "Image processed successfully",
+      compressedImagePath,
+    };
+  });
+}
 
 // Utility function to download and compress the image
 async function compressImage(
@@ -45,22 +115,12 @@ async function compressImage(
   fileName: string
 ): Promise<string> {
   try {
-    const outputDir = path.join(__dirname, "../../public");
-    await fs.ensureDir(outputDir);
-    const imageName = removeBaseUrl(imageUrl).replace(/[/\s]/g, "-");
-
-    const outputFilePath = path.join(
-      outputDir,
-      `compressed-${fileId}-${
-        fileName.split(".")[0]
-      }-${serialNumber}-${imageName.split(".").pop()}.jpeg`
-    );
-
-    productImagesRepository.update(
-      { slNo: serialNumber, status: ImageProcessingStatus.PENDING },
-      {
-        status: ImageProcessingStatus.PROCESSING,
-      }
+    await fs.ensureDir(FILE_PUBLIC_PATH);
+    const outputFilePath = PROCESSED_FILE_SAVE_PATH(
+      fileId,
+      fileName.split(".")[0],
+      serialNumber,
+      imageUrl
     );
 
     // Download the image and compress it using `sharp`
@@ -69,20 +129,11 @@ async function compressImage(
     const responseAfterCompress = await sharp(buffer)
       .jpeg({ quality: 50 }) // TODO: add variable quality environment variable
       .toFile(outputFilePath);
-
-    fileMetadataRepository.increment({ id: fileId }, "imageProcessed", 1);
-
-    console.log(
-      "Image compressed successfully:",
-      outputDir,
-      outputFilePath.replace(outputDir, "http://localhost:8000/public")
-    );
-
     productImagesRepository.update(
       { slNo: serialNumber, status: ImageProcessingStatus.PROCESSING },
       {
         processedImageUrl: `${outputFilePath.replace(
-          outputDir,
+          FILE_PUBLIC_PATH,
           "http://localhost:8000/public"
         )}`,
         rawImageSize: buffer.length,

@@ -1,4 +1,10 @@
-import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import {
+  Column,
+  Entity,
+  ManyToOne,
+  PrimaryGeneratedColumn,
+  Unique,
+} from "typeorm";
 import { FileMetadata } from "../fileMetadata/fileMetadata.model";
 
 export enum ImageProcessingStatus {
@@ -9,6 +15,7 @@ export enum ImageProcessingStatus {
 }
 
 @Entity()
+@Unique(["slNo", "sku", "rawImageUrl"]) // Adding composite unique constraint
 export class ProductImages {
   @PrimaryGeneratedColumn()
   id?: number;
