@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   postgres:
     image: postgres:14
@@ -21,25 +19,25 @@ services:
     volumes:
       - redis_data:/data
 
-  nodejs_app:
-    build: 
-      context: .  # Assuming Dockerfile is in the root of your project
-      dockerfile: Dockerfile
-    container_name: nodejs_app
-    environment:
-      POSTGRES_USER: user
-      POSTGRES_PASSWORD: password
-      POSTGRES_DB: image_processing
-      REDIS_HOST: redis_db
-      REDIS_PORT: 6379
-    ports:
-      - "8000:8000" # Expose your app on port 8000
-    depends_on:
-      - postgres
-      - redis
-    volumes:
-      - .:/usr/src/app
-    command: npm run dev # Adjust this according to how you start your Node.js app
+  # nodejs_app:
+  #   build: 
+  #     context: .  # Assuming Dockerfile is in the root of your project
+  #     dockerfile: Dockerfile
+  #   container_name: nodejs_app
+  #   environment:
+  #     POSTGRES_USER: user
+  #     POSTGRES_PASSWORD: password
+  #     POSTGRES_DB: image_processing
+  #     REDIS_HOST: redis_db
+  #     REDIS_PORT: 6379
+  #   ports:
+  #     - "8000:8000" # Expose your app on port 8000
+  #   depends_on:
+  #     - postgres
+  #     - redis
+  #   volumes:
+  #     - .:/usr/src/app
+  #   command: npm run dev # Adjust this according to how you start your Node.js app
 
 volumes:
   postgres_data:

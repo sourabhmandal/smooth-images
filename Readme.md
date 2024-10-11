@@ -13,4 +13,4 @@ Due to issues with sharp library I am not able to build and run the app with doc
 2. Run the Docker compose file - `docker compose up -d`
 3. Run the nodejs app - `npm run dev`
 
-### adding more documentation..
+### adding more documentation...
