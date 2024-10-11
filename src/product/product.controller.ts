@@ -3,9 +3,11 @@ import { Request, Response } from "express";
 import fs from "fs";
 import multer from "multer";
 import { AppDataSource } from "../db/index";
+import { FileMetadata } from "../fileMetadata/fileMetadata.model";
+import { imageQueue } from "../queue/image-process";
 import { ProductImages } from "./product.model";
 const productImagesRepository = AppDataSource.getRepository(ProductImages);
-
+const fileMetadataRepository = AppDataSource.getRepository(FileMetadata);
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
@@ -44,19 +46,43 @@ export function uploadCsv(req: MulterRequest, res: Response): void {
       }
 
       let insertData: Array<ProductImages> = [];
-      results.map((data) => {
-        const daaa = data["Input Image Urls"]
-          .split(",")
-          .map((url) => url.trim());
 
-        const insertValues = daaa.map((url) => ({
-          slNo: data["S. No."],
-          sku: data["Product Name"],
-          imageUrl: url,
-        }));
+      // create a file meta
+      if (req.file) {
+        const allImagesCount = results.reduce(
+          (acc, curr) =>
+            curr["Input Image Urls"].split(",").map((url) => url.trim())
+              .length + acc,
+          0
+        );
+        const fileMetadata: FileMetadata = {
+          fileName: req.file.originalname,
+          totalImages: allImagesCount,
+          imageProcessed: 0,
+          images: [],
+        };
+        const reqFile = await fileMetadataRepository.upsert(fileMetadata, {
+          conflictPaths: ["fileName"],
+          skipUpdateIfNoValuesChanged: true,
+        });
 
-        return insertData.push(...insertValues);
-      });
+        // create file image list
+        results.map((data) => {
+          const daaa = data["Input Image Urls"]
+            .split(",")
+            .map((url) => url.trim());
+
+          const insertValues: Array<ProductImages> = daaa.map((url) => ({
+            slNo: data["S. No."],
+            sku: data["Product Name"],
+            rawImageUrl: url,
+            rawImageSize: 0,
+            fileMetadata: fileMetadata,
+          }));
+
+          return insertData.push(...insertValues);
+        });
+      }
 
       // Save the data to database
       const insertResponse = await productImagesRepository
@@ -65,6 +91,19 @@ export function uploadCsv(req: MulterRequest, res: Response): void {
         .into(ProductImages)
         .values(insertData)
         .execute();
+
+      // Create image processing jobs
+      imageQueue.addBulk(
+        insertData.map((data) => ({
+          data: {
+            serialNumber: data.slNo,
+            imageUrl: data.rawImageUrl,
+            fileId: data.fileMetadata.id,
+            fileName: data.fileMetadata.fileName,
+          },
+        }))
+      );
+
       res.json({ savedProduct: insertResponse.generatedMaps });
     })
     .on("error", (err) => {

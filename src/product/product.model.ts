@@ -1,4 +1,12 @@
-import { Column, Entity, PrimaryGeneratedColumn } from "typeorm";
+import { Column, Entity, ManyToOne, PrimaryGeneratedColumn } from "typeorm";
+import { FileMetadata } from "../fileMetadata/fileMetadata.model";
+
+export enum ImageProcessingStatus {
+  PENDING = "pending",
+  PROCESSING = "processing",
+  COMPLETED = "completed",
+  FAILED = "failed",
+}
 
 @Entity()
 export class ProductImages {
@@ -12,5 +20,28 @@ export class ProductImages {
   sku: string;
 
   @Column()
-  imageUrl: string;
+  rawImageUrl: string;
+
+  @Column()
+  rawImageSize: number;
+
+  @Column({
+    nullable: true,
+  })
+  processedImageUrl?: string;
+
+  @Column({
+    nullable: true,
+  })
+  processedImageSize?: number;
+
+  @Column({
+    type: "enum",
+    enum: ImageProcessingStatus,
+    default: ImageProcessingStatus.PENDING,
+  })
+  status?: ImageProcessingStatus;
+
+  @ManyToOne(() => FileMetadata, (fileMetadata) => fileMetadata.images)
+  fileMetadata: FileMetadata;
 }
