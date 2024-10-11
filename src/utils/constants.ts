@@ -5,7 +5,6 @@ import {
   sanitizeImagePath,
 } from "./stringProcessing";
 
-export const FILE_UPLOAD_PATH = path.join(__dirname, "../../public", "raw");
 export const FILE_PUBLIC_PATH = path.join(__dirname, "../../public");
 export const PROCESSED_FILE_SAVE_PATH = (
   fileId: number,
