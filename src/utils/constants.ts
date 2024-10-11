@@ -6,6 +6,7 @@ import {
 } from "./stringProcessing";
 
 export const FILE_PUBLIC_PATH = path.join(__dirname, "../../public");
+export const FILE_UPLOAD_PATH = path.join(__dirname, "../../uploads");
 export const PROCESSED_FILE_SAVE_PATH = (
   fileId: number,
   fileName: string,

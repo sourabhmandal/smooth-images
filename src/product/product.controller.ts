@@ -3,12 +3,13 @@ import { Request, Response } from "express";
 import fs from "fs-extra";
 import multer from "multer";
 import { createFileImageCompressionQueue } from "../queue/image-process";
+import { FILE_UPLOAD_PATH } from "../utils/constants";
 import { savedProductImageUrls, saveFileMetadata } from "./product.service";
 interface MulterRequest extends Request {
   file?: Express.Multer.File;
 }
 // Configure multer for file uploads
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: FILE_UPLOAD_PATH });
 
 // Type definition for the Multer file object
 

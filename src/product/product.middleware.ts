@@ -1,8 +1,9 @@
 import { NextFunction, Request, Response } from "express";
 import multer, { MulterError } from "multer";
+import { FILE_UPLOAD_PATH } from "../utils/constants";
 
 // Define the multer storage configuration
-const upload = multer({ dest: "uploads/" });
+const upload = multer({ dest: FILE_UPLOAD_PATH });
 
 // Middleware for CSV file upload
 export function uploadCsvMiddleware(
