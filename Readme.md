@@ -1,0 +1,3 @@
+# Smooth Images
+
+API Documentation
