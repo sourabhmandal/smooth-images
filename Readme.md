@@ -13,4 +13,6 @@ Due to issues with sharp library I am not able to build and run the app with doc
 2. Run the Docker compose file - `docker compose up -d`
 3. Run the node.js app - `npm run dev`
 
-### adding more documentation...
+# High Level Design
+
+![High level Design - Smooth Images](https://raw.githubusercontent.com/sourabhmandal/smooth-images/refs/heads/main/readme-resources/hld.svg)
