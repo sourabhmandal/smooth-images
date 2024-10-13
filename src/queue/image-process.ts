@@ -127,7 +127,7 @@ async function compressImage(
     const response = await axios.get(imageUrl, { responseType: "arraybuffer" });
     const buffer = Buffer.from(response.data, "binary");
     const responseAfterCompress = await sharp(buffer)
-      .jpeg({ quality: 50 })
+      .jpeg({ quality: env.COMPRESSION_QUALITY })
       .toFile(outputFilePath);
     productImagesRepository.update(
       { slNo: serialNumber, status: ImageProcessingStatus.PROCESSING },
